@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StrengthsFinder Network</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1f2937;
+    --border: rgba(255,255,255,0.08);
+    --text: #e6edf3;
+    --muted: #7d8590;
+
+    --executing: #f97316;
+    --strategic: #3b82f6;
+    --relationship: #22c55e;
+    --influencing: #a855f7;
+
+    --executing-glow: rgba(249,115,22,0.25);
+    --strategic-glow: rgba(59,130,246,0.25);
+    --relationship-glow: rgba(34,197,94,0.25);
+    --influencing-glow: rgba(168,85,247,0.25);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    background: var(--surface);
+    z-index: 10;
+  }
+
+  header h1 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.4rem;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+
+  header p {
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .legend {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.72rem;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid transparent;
+    transition: all 0.2s;
+    user-select: none;
+  }
+
+  .legend-item:hover { border-color: var(--border); background: var(--surface2); color: var(--text); }
+  .legend-item.active { border-color: currentColor; }
+
+  .legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  #canvas-container {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+  }
+
+  svg#network {
+    width: 100%;
+    height: 100%;
+    cursor: grab;
+  }
+
+  svg#network:active { cursor: grabbing; }
+
+  .sidebar {
+    width: 280px;
+    flex-shrink: 0;
+    border-left: 1px solid var(--border);
+    background: var(--surface);
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .sidebar h2 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1rem;
+    color: var(--muted);
+    font-style: italic;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .profile-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    animation: fadeIn 0.2s ease;
+  }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+  .profile-name {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.1rem;
+    margin-bottom: 10px;
+  }
+
+  .strength-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 0;
+    font-size: 0.78rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .strength-row:last-child { border-bottom: none; }
+
+  .rank-num {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.65rem;
+    font-weight: 600;
+    flex-shrink: 0;
+    opacity: 0.7;
+  }
+
+  .strength-name { flex: 1; }
+
+  .domain-badge {
+    font-size: 0.6rem;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .connections-section h3 {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  .connection-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 0;
+    font-size: 0.78rem;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: color 0.15s;
+  }
+
+  .connection-item:hover { color: white; }
+
+  .connection-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+  .empty-state {
+    color: var(--muted);
+    font-size: 0.82rem;
+    font-style: italic;
+    text-align: center;
+    padding: 30px 0;
+    line-height: 1.6;
+  }
+
+  .search-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 12px;
+    flex-shrink: 0;
+  }
+
+  .search-bar input {
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.8rem;
+    width: 100%;
+  }
+
+  .search-bar input::placeholder { color: var(--muted); }
+
+  .controls {
+    position: absolute;
+    bottom: 16px;
+    left: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    z-index: 5;
+  }
+
+  .ctrl-btn {
+    width: 32px; height: 32px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    transition: background 0.15s;
+    line-height: 1;
+  }
+
+  .ctrl-btn:hover { background: var(--surface2); }
+
+  .tooltip {
+    position: absolute;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 0.75rem;
+    pointer-events: none;
+    z-index: 100;
+    white-space: nowrap;
+    display: none;
+    color: var(--text);
+  }
+
+  .hint {
+    position: absolute;
+    bottom: 16px;
+    right: 16px;
+    font-size: 0.68rem;
+    color: var(--muted);
+    text-align: right;
+    line-height: 1.8;
+    z-index: 5;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>StrengthsFinder Network</h1>
+    <p>Click a person to explore their strengths and connections</p>
+  </div>
+  <div class="legend">
+    <div class="legend-item" data-domain="Executing" style="color: var(--executing)">
+      <div class="legend-dot" style="background:var(--executing)"></div> Executing
+    </div>
+    <div class="legend-item" data-domain="Strategic Thinking" style="color: var(--strategic)">
+      <div class="legend-dot" style="background:var(--strategic)"></div> Strategic Thinking
+    </div>
+    <div class="legend-item" data-domain="Relationship Building" style="color: var(--relationship)">
+      <div class="legend-dot" style="background:var(--relationship)"></div> Relationship Building
+    </div>
+    <div class="legend-item" data-domain="Influencing" style="color: var(--influencing)">
+      <div class="legend-dot" style="background:var(--influencing)"></div> Influencing
+    </div>
+  </div>
+</header>
+
+<div class="main">
+  <div id="canvas-container">
+    <svg id="network">
+      <defs>
+        <filter id="glow-executing">
+          <feGaussianBlur stdDeviation="4" result="blur"/>
+          <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+        </filter>
+        <filter id="glow-strategic">
+          <feGaussianBlur stdDeviation="4" result="blur"/>
+          <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+        </filter>
+        <filter id="glow-relationship">
+          <feGaussianBlur stdDeviation="4" result="blur"/>
+          <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+        </filter>
+        <filter id="glow-influencing">
+          <feGaussianBlur stdDeviation="4" result="blur"/>
+          <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+        </filter>
+      </defs>
+      <g id="zoom-layer">
+        <g id="links-layer"></g>
+        <g id="nodes-layer"></g>
+      </g>
+    </svg>
+    <div class="controls">
+      <button class="ctrl-btn" id="zoom-in">+</button>
+      <button class="ctrl-btn" id="zoom-out">−</button>
+      <button class="ctrl-btn" id="zoom-reset" title="Reset view">⊙</button>
+    </div>
+    <div class="hint">Scroll to zoom · Drag to pan</div>
+    <div class="tooltip" id="tooltip"></div>
+  </div>
+
+  <div class="sidebar">
+    <div class="search-bar">
+      <span style="color:var(--muted);font-size:0.85rem">⌕</span>
+      <input type="text" id="search" placeholder="Search person or strength…">
+    </div>
+    <div id="sidebar-content">
+      <div class="empty-state">Click any person<br>to see their strengths<br>and connections</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const PEOPLE = [
+  { name: "Amy", strengths: [
+    { domain: "Executing", name: "Consistency", rank: 1 },
+    { domain: "Relationship Building", name: "Developer", rank: 2 },
+    { domain: "Executing", name: "Discipline", rank: 3 },
+    { domain: "Relationship Building", name: "Positivity", rank: 4 },
+    { domain: "Strategic Thinking", name: "Context", rank: 5 }
+  ]},
+  { name: "Brandylyn", strengths: [
+    { domain: "Strategic Thinking", name: "Strategic", rank: 1 },
+    { domain: "Executing", name: "Arranger", rank: 2 },
+    { domain: "Strategic Thinking", name: "Analytical", rank: 3 },
+    { domain: "Executing", name: "Responsibility", rank: 4 },
+    { domain: "Executing", name: "Restorative", rank: 5 }
+  ]},
+  { name: "Charlie", strengths: [
+    { domain: "Executing", name: "Achiever", rank: 1 },
+    { domain: "Influencing", name: "Competition", rank: 2 },
+    { domain: "Executing", name: "Deliberative", rank: 3 },
+    { domain: "Relationship Building", name: "Relator", rank: 4 },
+    { domain: "Executing", name: "Restorative", rank: 5 }
+  ]},
+  { name: "Chris", strengths: [
+    { domain: "Executing", name: "Achiever", rank: 1 },
+    { domain: "Strategic Thinking", name: "Learner", rank: 2 },
+    { domain: "Strategic Thinking", name: "Analytical", rank: 3 },
+    { domain: "Executing", name: "Focus", rank: 4 },
+    { domain: "Executing", name: "Arranger", rank: 5 }
+  ]},
+  { name: "Emily O", strengths: [
+    { domain: "Relationship Building", name: "Developer", rank: 1 },
+    { domain: "Strategic Thinking", name: "Learner", rank: 2 },
+    { domain: "Relationship Building", name: "Positivity", rank: 3 },
+    { domain: "Executing", name: "Achiever", rank: 4 },
+    { domain: "Relationship Building", name: "Harmony", rank: 5 }
+  ]},
+  { name: "Emily W", strengths: [
+    { domain: "Relationship Building", name: "Relator", rank: 1 },
+    { domain: "Relationship Building", name: "Empathy", rank: 2 },
+    { domain: "Relationship Building", name: "Harmony", rank: 3 },
+    { domain: "Relationship Building", name: "Developer", rank: 4 },
+    { domain: "Executing", name: "Consistency", rank: 5 }
+  ]},
+  { name: "Fielder", strengths: [
+    { domain: "Executing", name: "Consistency", rank: 1 },
+    { domain: "Relationship Building", name: "Harmony", rank: 2 },
+    { domain: "Influencing", name: "Communication", rank: 3 },
+    { domain: "Strategic Thinking", name: "Context", rank: 4 },
+    { domain: "Relationship Building", name: "Includer", rank: 5 }
+  ]},
+  { name: "Geoff", strengths: [
+    { domain: "Relationship Building", name: "Positivity", rank: 1 },
+    { domain: "Strategic Thinking", name: "Strategic", rank: 2 },
+    { domain: "Strategic Thinking", name: "Learner", rank: 3 },
+    { domain: "Executing", name: "Focus", rank: 4 },
+    { domain: "Executing", name: "Restorative", rank: 5 }
+  ]},
+  { name: "Jess", strengths: [
+    { domain: "Executing", name: "Achiever", rank: 1 },
+    { domain: "Strategic Thinking", name: "Learner", rank: 2 },
+    { domain: "Executing", name: "Discipline", rank: 3 },
+    { domain: "Relationship Building", name: "Positivity", rank: 4 },
+    { domain: "Influencing", name: "Competition", rank: 5 }
+  ]},
+  { name: "Josh", strengths: [
+    { domain: "Influencing", name: "Significance", rank: 1 },
+    { domain: "Influencing", name: "Woo", rank: 2 },
+    { domain: "Influencing", name: "Competition", rank: 3 },
+    { domain: "Executing", name: "Focus", rank: 4 },
+    { domain: "Executing", name: "Consistency", rank: 5 }
+  ]},
+  { name: "Kathryn-Claire", strengths: [
+    { domain: "Influencing", name: "Communication", rank: 1 },
+    { domain: "Relationship Building", name: "Empathy", rank: 2 },
+    { domain: "Relationship Building", name: "Developer", rank: 3 },
+    { domain: "Influencing", name: "Woo", rank: 4 },
+    { domain: "Executing", name: "Responsibility", rank: 5 }
+  ]},
+  { name: "Kevin", strengths: [
+    { domain: "Relationship Building", name: "Adaptability", rank: 1 },
+    { domain: "Strategic Thinking", name: "Strategic", rank: 2 },
+    { domain: "Relationship Building", name: "Relator", rank: 3 },
+    { domain: "Relationship Building", name: "Empathy", rank: 4 },
+    { domain: "Executing", name: "Deliberative", rank: 5 }
+  ]},
+  { name: "Margot", strengths: [
+    { domain: "Executing", name: "Responsibility", rank: 1 },
+    { domain: "Executing", name: "Achiever", rank: 2 },
+    { domain: "Influencing", name: "Communication", rank: 3 },
+    { domain: "Executing", name: "Arranger", rank: 4 },
+    { domain: "Influencing", name: "Significance", rank: 5 }
+  ]},
+  { name: "Mark", strengths: [
+    { domain: "Strategic Thinking", name: "Context", rank: 1 },
+    { domain: "Strategic Thinking", name: "Learner", rank: 2 },
+    { domain: "Strategic Thinking", name: "Strategic", rank: 3 },
+    { domain: "Executing", name: "Consistency", rank: 4 },
+    { domain: "Relationship Building", name: "Relator", rank: 5 }
+  ]},
+  { name: "Marlee", strengths: [
+    { domain: "Executing", name: "Deliberative", rank: 1 },
+    { domain: "Executing", name: "Consistency", rank: 2 },
+    { domain: "Strategic Thinking", name: "Analytical", rank: 3 },
+    { domain: "Relationship Building", name: "Harmony", rank: 4 },
+    { domain: "Strategic Thinking", name: "Strategic", rank: 5 }
+  ]},
+  { name: "Melanie", strengths: [
+    { domain: "Strategic Thinking", name: "Learner", rank: 1 },
+    { domain: "Strategic Thinking", name: "Strategic", rank: 2 },
+    { domain: "Strategic Thinking", name: "Input", rank: 3 },
+    { domain: "Strategic Thinking", name: "Intellection", rank: 4 },
+    { domain: "Relationship Building", name: "Individualization", rank: 5 }
+  ]},
+  { name: "Paula", strengths: [
+    { domain: "Executing", name: "Arranger", rank: 1 },
+    { domain: "Strategic Thinking", name: "Strategic", rank: 2 },
+    { domain: "Relationship Building", name: "Positivity", rank: 3 },
+    { domain: "Executing", name: "Belief", rank: 4 },
+    { domain: "Strategic Thinking", name: "Learner", rank: 5 }
+  ]},
+  { name: "Sam", strengths: [
+    { domain: "Relationship Building", name: "Developer", rank: 1 },
+    { domain: "Executing", name: "Belief", rank: 2 },
+    { domain: "Executing", name: "Responsibility", rank: 3 },
+    { domain: "Relationship Building", name: "Positivity", rank: 4 },
+    { domain: "Strategic Thinking", name: "Learner", rank: 5 }
+  ]},
+  { name: "Savannah", strengths: [
+    { domain: "Relationship Building", name: "Connectedness", rank: 1 },
+    { domain: "Relationship Building", name: "Empathy", rank: 2 },
+    { domain: "Executing", name: "Discipline", rank: 3 },
+    { domain: "Executing", name: "Consistency", rank: 4 },
+    { domain: "Relationship Building", name: "Harmony", rank: 5 }
+  ]},
+  { name: "Suzanne", strengths: [
+    { domain: "Relationship Building", name: "Developer", rank: 1 },
+    { domain: "Relationship Building", name: "Positivity", rank: 2 },
+    { domain: "Strategic Thinking", name: "Learner", rank: 3 },
+    { domain: "Relationship Building", name: "Connectedness", rank: 4 },
+    { domain: "Relationship Building", name: "Relator", rank: 5 }
+  ]}
+];
+
+const DOMAIN_COLORS = {
+  "Executing": "#f97316",
+  "Strategic Thinking": "#3b82f6",
+  "Relationship Building": "#22c55e",
+  "Influencing": "#a855f7"
+};
+
+const DOMAIN_CSS = {
+  "Executing": "var(--executing)",
+  "Strategic Thinking": "var(--strategic)",
+  "Relationship Building": "var(--relationship)",
+  "Influencing": "var(--influencing)"
+};
+
+// Build connections
+const connections = [];
+for (let i = 0; i < PEOPLE.length; i++) {
+  for (let j = i+1; j < PEOPLE.length; j++) {
+    const shared = PEOPLE[i].strengths
+      .filter(s => PEOPLE[j].strengths.some(t => t.name === s.name))
+      .map(s => s.name);
+    if (shared.length > 0) {
+      connections.push({ a: i, b: j, shared });
+    }
+  }
+}
+
+// Force-directed layout
+const N = PEOPLE.length;
+const W = 900, H = 700;
+const cx = W/2, cy = H/2;
+
+// Init positions in a circle
+const nodes = PEOPLE.map((p, i) => {
+  const angle = (2 * Math.PI * i) / N;
+  const r = Math.min(W, H) * 0.36;
+  return {
+    x: cx + r * Math.cos(angle),
+    y: cy + r * Math.sin(angle),
+    vx: 0, vy: 0
+  };
+});
+
+// Simple force simulation
+function simulate(steps) {
+  for (let s = 0; s < steps; s++) {
+    const k = 0.02;
+    // Repulsion
+    for (let i = 0; i < N; i++) {
+      for (let j = i+1; j < N; j++) {
+        const dx = nodes[i].x - nodes[j].x;
+        const dy = nodes[i].y - nodes[j].y;
+        const d = Math.sqrt(dx*dx + dy*dy) || 1;
+        const f = 5000 / (d*d);
+        nodes[i].vx += f * dx / d;
+        nodes[i].vy += f * dy / d;
+        nodes[j].vx -= f * dx / d;
+        nodes[j].vy -= f * dy / d;
+      }
+    }
+    // Attraction along connections
+    for (const c of connections) {
+      const dx = nodes[c.b].x - nodes[c.a].x;
+      const dy = nodes[c.b].y - nodes[c.a].y;
+      const d = Math.sqrt(dx*dx + dy*dy) || 1;
+      const ideal = 120 + (3 - Math.min(c.shared.length, 3)) * 40;
+      const f = (d - ideal) * 0.04;
+      nodes[c.a].vx += f * dx / d;
+      nodes[c.a].vy += f * dy / d;
+      nodes[c.b].vx -= f * dx / d;
+      nodes[c.b].vy -= f * dy / d;
+    }
+    // Center gravity
+    for (let i = 0; i < N; i++) {
+      nodes[i].vx += (cx - nodes[i].x) * 0.005;
+      nodes[i].vy += (cy - nodes[i].y) * 0.005;
+    }
+    // Apply velocities with damping
+    for (let i = 0; i < N; i++) {
+      nodes[i].vx *= 0.85;
+      nodes[i].vy *= 0.85;
+      nodes[i].x += nodes[i].vx;
+      nodes[i].y += nodes[i].vy;
+    }
+  }
+}
+
+simulate(400);
+
+// Dominant domain per person
+function dominantDomain(person) {
+  const counts = {};
+  for (const s of person.strengths) {
+    counts[s.domain] = (counts[s.domain] || 0) + 1;
+  }
+  return Object.entries(counts).sort((a,b) => b[1]-a[1])[0][0];
+}
+
+// SVG state
+const svg = document.getElementById('network');
+const zoomLayer = document.getElementById('zoom-layer');
+const linksLayer = document.getElementById('links-layer');
+const nodesLayer = document.getElementById('nodes-layer');
+
+let viewBox = { x: -50, y: -50, w: W+100, h: H+100 };
+let selectedIdx = null;
+let hoveredIdx = null;
+let filterDomain = null;
+
+function setViewBox() {
+  svg.setAttribute('viewBox', `${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`);
+}
+setViewBox();
+
+function domainColor(domain) {
+  return DOMAIN_COLORS[domain] || '#888';
+}
+
+function getConnectionsFor(idx) {
+  return connections.filter(c => c.a === idx || c.b === idx).map(c => ({
+    other: c.a === idx ? c.b : c.a,
+    shared: c.shared
+  }));
+}
+
+function render() {
+  linksLayer.innerHTML = '';
+  nodesLayer.innerHTML = '';
+
+  // Build visible connections
+  const activeConns = filterDomain
+    ? connections.filter(c => {
+        const strengthsA = PEOPLE[c.a].strengths;
+        const strengthsB = PEOPLE[c.b].strengths;
+        return c.shared.some(sName => {
+          const sA = strengthsA.find(s => s.name === sName);
+          return sA && sA.domain === filterDomain;
+        });
+      })
+    : connections;
+
+  // Draw links
+  for (const c of activeConns) {
+    const ax = nodes[c.a].x, ay = nodes[c.a].y;
+    const bx = nodes[c.b].x, by = nodes[c.b].y;
+
+    const isHighlighted = selectedIdx !== null && (c.a === selectedIdx || c.b === selectedIdx);
+    const isRelated = selectedIdx !== null && isHighlighted;
+    const isDimmed = selectedIdx !== null && !isHighlighted;
+
+    // Color based on first shared strength's domain
+    const firstShared = c.shared[0];
+    const domainOfShared = PEOPLE[c.a].strengths.find(s => s.name === firstShared)?.domain || "Executing";
+    const col = domainColor(domainOfShared);
+
+    const opacity = isDimmed ? 0.04 : isHighlighted ? 0.9 : (selectedIdx === null ? 0.18 : 0.18);
+    const strokeWidth = isHighlighted ? 2.5 : Math.min(c.shared.length * 0.8, 2);
+
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', ax); line.setAttribute('y1', ay);
+    line.setAttribute('x2', bx); line.setAttribute('y2', by);
+    line.setAttribute('stroke', col);
+    line.setAttribute('stroke-width', strokeWidth);
+    line.setAttribute('stroke-opacity', opacity);
+    if (isHighlighted) {
+      line.setAttribute('stroke-dasharray', '0');
+      line.setAttribute('filter', `drop-shadow(0 0 4px ${col}88)`);
+    }
+    linksLayer.appendChild(line);
+
+    // Label shared strength on highlighted connection
+    if (isHighlighted && c.shared.length > 0) {
+      const mx = (ax + bx) / 2;
+      const my = (ay + by) / 2;
+      const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      label.setAttribute('x', mx);
+      label.setAttribute('y', my - 6);
+      label.setAttribute('text-anchor', 'middle');
+      label.setAttribute('fill', col);
+      label.setAttribute('font-size', '9');
+      label.setAttribute('font-family', 'DM Sans, sans-serif');
+      label.setAttribute('opacity', '0.9');
+      label.textContent = c.shared.join(', ');
+      linksLayer.appendChild(label);
+    }
+  }
+
+  // Draw nodes
+  for (let i = 0; i < N; i++) {
+    const person = PEOPLE[i];
+    const nd = nodes[i];
+    const domain = dominantDomain(person);
+    const col = domainColor(domain);
+    const isSelected = selectedIdx === i;
+    const isConnected = selectedIdx !== null && connections.some(c =>
+      (c.a === selectedIdx && c.b === i) || (c.b === selectedIdx && c.a === i)
+    );
+    const isDimmed = selectedIdx !== null && !isSelected && !isConnected;
+
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    g.setAttribute('transform', `translate(${nd.x},${nd.y})`);
+    g.setAttribute('cursor', 'pointer');
+    g.style.opacity = isDimmed ? '0.25' : '1';
+
+    // Outer ring
+    const ring = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    ring.setAttribute('r', isSelected ? 22 : 18);
+    ring.setAttribute('fill', 'none');
+    ring.setAttribute('stroke', col);
+    ring.setAttribute('stroke-width', isSelected ? 2.5 : 1.5);
+    ring.setAttribute('stroke-opacity', isSelected ? 1 : 0.5);
+    if (isSelected) {
+      ring.setAttribute('filter', `drop-shadow(0 0 8px ${col})`);
+    }
+    g.appendChild(ring);
+
+    // Inner circle
+    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    circle.setAttribute('r', isSelected ? 17 : 14);
+    circle.setAttribute('fill', isSelected ? col : col + '33');
+    g.appendChild(circle);
+
+    // Label
+    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    text.setAttribute('text-anchor', 'middle');
+    text.setAttribute('dominant-baseline', 'middle');
+    text.setAttribute('fill', isSelected ? '#fff' : col);
+    text.setAttribute('font-size', person.name.length > 7 ? '7.5' : '8.5');
+    text.setAttribute('font-family', 'DM Sans, sans-serif');
+    text.setAttribute('font-weight', '600');
+    text.setAttribute('pointer-events', 'none');
+    // Shorten long names
+    const displayName = person.name.replace('Kathryn-Claire', 'K-Claire');
+    text.textContent = displayName;
+    g.appendChild(text);
+
+    g.addEventListener('click', (e) => {
+      e.stopPropagation();
+      selectedIdx = selectedIdx === i ? null : i;
+      render();
+      updateSidebar();
+    });
+
+    g.addEventListener('mouseenter', (e) => {
+      hoveredIdx = i;
+      const tip = document.getElementById('tooltip');
+      const rect = document.getElementById('canvas-container').getBoundingClientRect();
+      tip.style.display = 'block';
+      tip.style.left = (e.clientX - rect.left + 12) + 'px';
+      tip.style.top = (e.clientY - rect.top - 28) + 'px';
+      tip.innerHTML = `<strong>${person.name}</strong> · ${person.strengths.length} strengths`;
+    });
+
+    g.addEventListener('mousemove', (e) => {
+      const tip = document.getElementById('tooltip');
+      const rect = document.getElementById('canvas-container').getBoundingClientRect();
+      tip.style.left = (e.clientX - rect.left + 12) + 'px';
+      tip.style.top = (e.clientY - rect.top - 28) + 'px';
+    });
+
+    g.addEventListener('mouseleave', () => {
+      hoveredIdx = null;
+      document.getElementById('tooltip').style.display = 'none';
+    });
+
+    nodesLayer.appendChild(g);
+  }
+}
+
+function updateSidebar() {
+  const content = document.getElementById('sidebar-content');
+  if (selectedIdx === null) {
+    content.innerHTML = '<div class="empty-state">Click any person<br>to see their strengths<br>and connections</div>';
+    return;
+  }
+
+  const person = PEOPLE[selectedIdx];
+  const conns = getConnectionsFor(selectedIdx);
+
+  // Group connections by shared strength
+  const byStrength = {};
+  for (const c of conns) {
+    for (const s of c.shared) {
+      if (!byStrength[s]) byStrength[s] = [];
+      byStrength[s].push(c.other);
+    }
+  }
+
+  let html = `<div class="profile-card">
+    <div class="profile-name" style="color:${domainColor(dominantDomain(person))}">${person.name}</div>`;
+
+  for (const s of person.strengths) {
+    const col = domainColor(s.domain);
+    const bgCol = col + '22';
+    html += `<div class="strength-row">
+      <div class="rank-num" style="background:${bgCol};color:${col}">${s.rank}</div>
+      <span class="strength-name">${s.name}</span>
+      <span class="domain-badge" style="background:${bgCol};color:${col}">${s.domain.split(' ')[0]}</span>
+    </div>`;
+  }
+  html += `</div>`;
+
+  // Connections section
+  html += `<div class="connections-section">
+    <h3>${conns.length} Shared Strength Connection${conns.length !== 1 ? 's' : ''}</h3>`;
+
+  if (conns.length === 0) {
+    html += '<div style="color:var(--muted);font-size:0.78rem;font-style:italic">No shared strengths found</div>';
+  } else {
+    // Sort by number of shared strengths desc
+    const sorted = [...conns].sort((a,b) => b.shared.length - a.shared.length);
+    for (const c of sorted) {
+      const other = PEOPLE[c.other];
+      const dom = dominantDomain(other);
+      const col = domainColor(dom);
+      html += `<div class="connection-item" data-idx="${c.other}">
+        <div class="connection-dot" style="background:${col}"></div>
+        <span style="flex:1;font-weight:500">${other.name}</span>
+        <span style="color:var(--muted);font-size:0.7rem">${c.shared.join(', ')}</span>
+      </div>`;
+    }
+  }
+  html += `</div>`;
+
+  content.innerHTML = html;
+
+  // Click on connection items
+  content.querySelectorAll('.connection-item').forEach(el => {
+    el.addEventListener('click', () => {
+      selectedIdx = parseInt(el.dataset.idx);
+      render();
+      updateSidebar();
+    });
+  });
+}
+
+// Pan & zoom
+let isPanning = false;
+let panStart = { x: 0, y: 0 };
+let panViewBox = null;
+
+svg.addEventListener('mousedown', (e) => {
+  if (e.target === svg || e.target.id === 'network' || e.target.closest('#links-layer') || e.target.id === 'zoom-layer') {
+    isPanning = true;
+    panStart = { x: e.clientX, y: e.clientY };
+    panViewBox = { ...viewBox };
+    if (e.target === svg || e.target.id === 'network' || e.target.id === 'zoom-layer') {
+      selectedIdx = null;
+      render();
+      updateSidebar();
+    }
+  }
+});
+
+window.addEventListener('mousemove', (e) => {
+  if (!isPanning) return;
+  const scale = viewBox.w / svg.clientWidth;
+  viewBox.x = panViewBox.x - (e.clientX - panStart.x) * scale;
+  viewBox.y = panViewBox.y - (e.clientY - panStart.y) * scale;
+  setViewBox();
+});
+
+window.addEventListener('mouseup', () => { isPanning = false; });
+
+svg.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const rect = svg.getBoundingClientRect();
+  const mx = (e.clientX - rect.left) / rect.width;
+  const my = (e.clientY - rect.top) / rect.height;
+  const factor = e.deltaY > 0 ? 1.12 : 0.89;
+  const nx = viewBox.x + viewBox.w * mx;
+  const ny = viewBox.y + viewBox.h * my;
+  viewBox.w *= factor;
+  viewBox.h *= factor;
+  viewBox.x = nx - viewBox.w * mx;
+  viewBox.y = ny - viewBox.h * my;
+  setViewBox();
+}, { passive: false });
+
+document.getElementById('zoom-in').addEventListener('click', () => {
+  const cx2 = viewBox.x + viewBox.w/2, cy2 = viewBox.y + viewBox.h/2;
+  viewBox.w *= 0.8; viewBox.h *= 0.8;
+  viewBox.x = cx2 - viewBox.w/2; viewBox.y = cy2 - viewBox.h/2;
+  setViewBox();
+});
+
+document.getElementById('zoom-out').addEventListener('click', () => {
+  const cx2 = viewBox.x + viewBox.w/2, cy2 = viewBox.y + viewBox.h/2;
+  viewBox.w *= 1.25; viewBox.h *= 1.25;
+  viewBox.x = cx2 - viewBox.w/2; viewBox.y = cy2 - viewBox.h/2;
+  setViewBox();
+});
+
+document.getElementById('zoom-reset').addEventListener('click', () => {
+  viewBox = { x: -50, y: -50, w: W+100, h: H+100 };
+  setViewBox();
+});
+
+// Search
+document.getElementById('search').addEventListener('input', (e) => {
+  const q = e.target.value.toLowerCase().trim();
+  if (!q) {
+    nodesLayer.querySelectorAll('g').forEach(g => g.style.opacity = '');
+    return;
+  }
+  for (let i = 0; i < N; i++) {
+    const person = PEOPLE[i];
+    const matches = person.name.toLowerCase().includes(q) ||
+      person.strengths.some(s => s.name.toLowerCase().includes(q));
+    const g = nodesLayer.children[i];
+    if (g) g.style.opacity = matches ? '1' : '0.15';
+  }
+});
+
+// Domain filter
+document.querySelectorAll('.legend-item').forEach(el => {
+  el.addEventListener('click', () => {
+    const d = el.dataset.domain;
+    if (filterDomain === d) {
+      filterDomain = null;
+      el.classList.remove('active');
+    } else {
+      filterDomain = d;
+      document.querySelectorAll('.legend-item').forEach(x => x.classList.remove('active'));
+      el.classList.add('active');
+    }
+    render();
+  });
+});
+
+render();
+updateSidebar();
+</script>
+</body>
+</html>
